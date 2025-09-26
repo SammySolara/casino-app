@@ -1,3 +1,4 @@
+import { Dice1 } from 'lucide-react';
 // Auth Layout Component
 const AuthLayout = ({ children, title, subtitle }) => {
   return (
