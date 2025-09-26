@@ -1,7 +1,3 @@
-import React, { useState } from 'react';
-import { Eye, EyeOff, DollarSign, Users, TrendingUp, Dice1 } from 'lucide-react';
-import { AuthProvider, useAuth } from '../../contexts/AuthContext';
-
 // Auth Layout Component
 const AuthLayout = ({ children, title, subtitle }) => {
   return (
