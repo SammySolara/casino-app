@@ -62,7 +62,7 @@ const Dashboard = () => {
               onClick={() => navigate('/dashboard')}
             >
               <Dice1 className="h-8 w-8 text-yellow-400 mr-3" />
-              <h1 className="text-2xl font-bold text-white">Casino Royal</h1>
+              <h1 className="text-2xl font-bold text-white">Clunga Casino</h1>
             </div>
             
             <div className="flex items-center space-x-6">
@@ -156,7 +156,7 @@ const Dashboard = () => {
           <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
             <h3 className="text-xl font-bold text-white mb-4">Recent Activity</h3>
             <div className="text-gray-300">
-              <p>Welcome to Casino Royal! Start playing to see your activity here.</p>
+              <p>Welcome to Clunga Casino! Start playing to see your activity here.</p>
             </div>
           </div>
 

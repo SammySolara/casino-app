@@ -11,7 +11,7 @@ const AuthLayout = ({ children, title, subtitle }) => {
           <div className="flex items-center justify-center mb-4">
             <Dice1 className="h-12 w-12 text-yellow-400" />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">Casino Royal</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">Clunga Casino</h1>
           <p className="text-gray-300">Your premium gambling experience</p>
         </div>
         
