@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, DollarSign, Users, TrendingUp, Dice1 } from 'lucide-react';
-import { AuthProvider, useAuth } from '../../contexts/AuthContext';
-import AuthLayout from './AuthLayout'
+import { Link } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import AuthLayout from './AuthLayout';
 
-const SignIn = ({ onSwitchToSignUp }) => {
+const SignIn = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -92,13 +93,12 @@ const SignIn = ({ onSwitchToSignUp }) => {
 
         <div className="text-center">
           <span className="text-gray-300">Don't have an account? </span>
-          <button
-            type="button"
-            onClick={onSwitchToSignUp}
+          <Link
+            to="/signup"
             className="text-yellow-400 hover:text-yellow-300 font-medium"
           >
             Sign up
-          </button>
+          </Link>
         </div>
       </div>
     </AuthLayout>
