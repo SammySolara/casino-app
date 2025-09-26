@@ -1,11 +1,38 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DollarSign, Users, TrendingUp, Dice1 } from 'lucide-react';
+import { DollarSign, Users, TrendingUp, Dice1, Trophy, Crown } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
 
 const Dashboard = () => {
   const { user, userProfile, signOut } = useAuth();
   const navigate = useNavigate();
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchLeaderboard();
+  }, []);
+
+  const fetchLeaderboard = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, username, balance')
+        .order('balance', { ascending: false })
+        .limit(10);
+
+      if (error) {
+        console.error('Error fetching leaderboard:', error);
+      } else {
+        setLeaderboard(data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching leaderboard:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -118,7 +145,6 @@ const Dashboard = () => {
                 >
                   <IconComponent className={`h-12 w-12 ${game.color} mx-auto mb-3`} />
                   <h3 className="text-white font-semibold">{game.name}</h3>
-                  <p className="text-gray-400 text-sm mt-1">Coming Soon</p>
                 </div>
               );
             })}
@@ -135,10 +161,51 @@ const Dashboard = () => {
           </div>
 
           <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6">
-            <h3 className="text-xl font-bold text-white mb-4">Leaderboard</h3>
-            <div className="text-gray-300">
-              <p>Play games to appear on the leaderboard!</p>
-            </div>
+            <h3 className="text-xl font-bold text-white mb-4 flex items-center">
+              <Trophy className="h-5 w-5 mr-2 text-yellow-400" />
+              Leaderboard
+            </h3>
+            {loading ? (
+              <div className="text-center text-gray-300 py-4">Loading...</div>
+            ) : leaderboard.length > 0 ? (
+              <div className="space-y-2">
+                {leaderboard.map((player, index) => (
+                  <div 
+                    key={player.id}
+                    className={`flex items-center justify-between p-3 rounded-lg ${
+                      player.id === user?.id ? 'bg-yellow-500/20 border border-yellow-500/30' : 'bg-white/5'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                        index === 0 ? 'bg-yellow-500 text-black' :
+                        index === 1 ? 'bg-gray-400 text-black' :
+                        index === 2 ? 'bg-yellow-600 text-black' :
+                        'bg-white/20 text-white'
+                      }`}>
+                        {index === 0 && <Crown className="h-3 w-3" />}
+                        {index !== 0 && (index + 1)}
+                      </div>
+                      <div>
+                        <p className={`font-semibold ${
+                          player.id === user?.id ? 'text-yellow-300' : 'text-white'
+                        }`}>
+                          {player.username || 'Anonymous'}
+                          {player.id === user?.id && ' (You)'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-green-400 font-semibold">
+                        ${player.balance?.toLocaleString() || '0'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-gray-300 text-center py-4">No players yet!</div>
+            )}
           </div>
         </div>
       </main>
