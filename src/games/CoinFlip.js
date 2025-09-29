@@ -5,11 +5,8 @@ import {
   Coins,
   ArrowLeft,
   Users,
-  RefreshCw,
-  Trophy,
-  Crown,
-} from "lucide-react";
-import { useAuth } from "../../contexts/AuthContext";
+  RefreshCw,} from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../../lib/supabase";
 
 const CoinFlip = () => {
