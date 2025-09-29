@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   DollarSign,
@@ -6,8 +6,6 @@ import {
   ArrowLeft,
   Users,
   RefreshCw,
-  Trophy,
-  Crown,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
@@ -36,7 +34,6 @@ const CoinFlip = () => {
   useEffect(() => {
     fetchLobbies();
 
-    // Set up realtime subscription
     const channel = supabase
       .channel("coinflip-lobbies")
       .on(
@@ -49,11 +46,9 @@ const CoinFlip = () => {
         (payload) => {
           fetchLobbies();
 
-          // If we're in a lobby and it gets updated
           if (currentLobby && payload.new?.id === currentLobby.id) {
             if (payload.new.status === "filled" && payload.new.opponent_id) {
               setCurrentLobby(payload.new);
-              // Start flip if opponent joined
               if (payload.new.creator_id === user.id) {
                 setTimeout(() => executeFlip(payload.new), 2000);
               }
@@ -66,7 +61,7 @@ const CoinFlip = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentLobby]);
+  }, [currentLobby, user?.id, executeFlip]);
 
   const fetchLobbies = async () => {
     try {
@@ -477,7 +472,6 @@ const CoinFlip = () => {
   );
 
   const renderInLobby = () => {
-    const isCreator = currentLobby?.creator_id === user.id;
     const waiting = currentLobby?.status === "open";
 
     return (
