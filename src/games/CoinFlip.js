@@ -115,63 +115,37 @@ const CoinFlip = () => {
   }, []);
 
   const executeFlip = useCallback(
-    async (lobby) => {
+    (lobby) => {
       setView("flipping");
       setFlipping(true);
-      setFlipResult(null);
-      setGameResult(null);
 
-      const flipDuration = 3000;
-      const flipInterval = 100;
-      let currentTime = 0;
+      // animate for 3s
+      setTimeout(() => {
+        setFlipping(false);
+        setFlipResult(lobby.result);
 
-      const flipAnimation = setInterval(() => {
-        setFlipResult(Math.random() > 0.5 ? "heads" : "tails");
-        currentTime += flipInterval;
+        const isCreator = lobby.creator_id === user.id;
+        const mySide = isCreator
+          ? lobby.creator_side
+          : lobby.creator_side === "heads"
+          ? "tails"
+          : "heads";
+        const won = lobby.result === mySide;
 
-        if (currentTime >= flipDuration) {
-          clearInterval(flipAnimation);
+        setGameResult({
+          type: won ? "win" : "lose",
+          message: won
+            ? `You won $${lobby.stake_amount.toFixed(2)}!`
+            : `You lost $${lobby.stake_amount.toFixed(2)}!`,
+          result: lobby.result,
+        });
 
-          const finalResult = Math.random() > 0.5 ? "heads" : "tails";
-          setFlipResult(finalResult);
-          setFlipping(false);
-
-          const isCreator = lobby.creator_id === user.id;
-          const mySide = isCreator
-            ? lobby.creator_side
-            : lobby.creator_side === "heads"
-            ? "tails"
-            : "heads";
-          const won = finalResult === mySide;
-
-          setBalance((currentBalance) => {
-            const newBalance = won
-              ? currentBalance + lobby.stake_amount
-              : currentBalance - lobby.stake_amount;
-
-            updateUserBalance(newBalance);
-            return newBalance;
-          });
-
-          setGameResult({
-            type: won ? "win" : "lose",
-            message: won
-              ? `You won $${lobby.stake_amount.toFixed(2)}!`
-              : `You lost $${lobby.stake_amount.toFixed(2)}!`,
-            result: finalResult,
-          });
-
-          saveGameResult(lobby, won, finalResult);
-          updateLobbyStatus(
-            lobby.id,
-            finalResult,
-            won ? user.id : isCreator ? lobby.opponent_id : lobby.creator_id
-          );
-        }
-      }, flipInterval);
+        setBalance(userProfile.balance); // Supabase already updated balances
+      }, 3000);
     },
-    [user.id, saveGameResult, updateUserBalance, updateLobbyStatus]
+    [user.id, userProfile.balance]
   );
+  
 
   useEffect(() => {
     fetchLobbies();
@@ -192,11 +166,18 @@ const CoinFlip = () => {
             if (payload.new.status === "filled" && payload.new.opponent_id) {
               setCurrentLobby(payload.new);
               if (payload.new.creator_id === user.id) {
-                setTimeout(() => executeFlip(payload.new), 2000);
+                fetch("https://dwmjtqxbdbgsgwipjlim.supabase.co/functions/v1/coinflip-resolve", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "Authorization": `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}`, // or session token if needed
+                    },
+                    body: JSON.stringify({ lobbyId: payload.new.id }),
+                  }).catch(console.error);
+                }
               }
             }
           }
-        }
       )
       .subscribe();
 
