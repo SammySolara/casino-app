@@ -5,15 +5,18 @@ import {
   Coins,
   ArrowLeft,
   Users,
-  RefreshCw,} from "lucide-react";
+  RefreshCw,
+  Trophy,
+  Crown,
+} from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-import { supabase } from "../../lib/supabase";
+import { supabase } from "../lib/supabase";
 
 const CoinFlip = () => {
   const { user, userProfile, signOut } = useAuth();
   const navigate = useNavigate();
 
-  const [view, setView] = useState("lobby-list"); // 'lobby-list', 'create-lobby', 'in-lobby', 'flipping'
+  const [view, setView] = useState("lobby-list");
   const [lobbies, setLobbies] = useState([]);
   const [currentLobby, setCurrentLobby] = useState(null);
   const [stakeAmount, setStakeAmount] = useState(10);
@@ -30,73 +33,9 @@ const CoinFlip = () => {
     }
   }, [userProfile]);
 
-  const executeFlip = async (lobby) => {
-    setView("flipping");
-    setFlipping(true);
-    setFlipResult(null);
-    setGameResult(null);
-
-    // Animate coin flip
-    const flipDuration = 3000;
-    const flipInterval = 100;
-    let currentTime = 0;
-
-    const flipAnimation = setInterval(() => {
-      setFlipResult(Math.random() > 0.5 ? "heads" : "tails");
-      currentTime += flipInterval;
-
-      if (currentTime >= flipDuration) {
-        clearInterval(flipAnimation);
-
-        // Generate final result (server-side RNG simulation)
-        const finalResult = Math.random() > 0.5 ? "heads" : "tails";
-        setFlipResult(finalResult);
-        setFlipping(false);
-
-        // Determine winner
-        const isCreator = lobby.creator_id === user.id;
-        const mySide = isCreator
-          ? lobby.creator_side
-          : lobby.creator_side === "heads"
-          ? "tails"
-          : "heads";
-        const won = finalResult === mySide;
-
-        let newBalance;
-        if (won) {
-          newBalance = balance + lobby.stake_amount;
-          setGameResult({
-            type: "win",
-            message: `You won ${lobby.stake_amount.toFixed(2)}!`,
-            result: finalResult,
-          });
-        } else {
-          newBalance = balance - lobby.stake_amount;
-          setGameResult({
-            type: "lose",
-            message: `You lost ${lobby.stake_amount.toFixed(2)}!`,
-            result: finalResult,
-          });
-        }
-
-        // Update balance and save result
-        updateUserBalance(newBalance);
-        saveGameResult(lobby, won, finalResult);
-
-        // Update lobby status
-        updateLobbyStatus(
-          lobby.id,
-          finalResult,
-          won ? user.id : isCreator ? lobby.opponent_id : lobby.creator_id
-        );
-      }
-    }, flipInterval);
-  };
-
   useEffect(() => {
     fetchLobbies();
 
-    // Set up realtime subscription
     const channel = supabase
       .channel("coinflip-lobbies")
       .on(
@@ -109,11 +48,9 @@ const CoinFlip = () => {
         (payload) => {
           fetchLobbies();
 
-          // If we're in a lobby and it gets updated
           if (currentLobby && payload.new?.id === currentLobby.id) {
             if (payload.new.status === "filled" && payload.new.opponent_id) {
               setCurrentLobby(payload.new);
-              // Start flip if opponent joined
               if (payload.new.creator_id === user.id) {
                 setTimeout(() => executeFlip(payload.new), 2000);
               }
@@ -259,7 +196,6 @@ const CoinFlip = () => {
       if (!error && data) {
         setCurrentLobby(data);
         setView("in-lobby");
-        // Trigger flip after joining
         setTimeout(() => executeFlip(data), 2000);
       } else {
         alert("Failed to join lobby");
@@ -270,6 +206,102 @@ const CoinFlip = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const executeFlip = async (lobby) => {
+    setView("flipping");
+    setFlipping(true);
+    setFlipResult(null);
+    setGameResult(null);
+
+    const flipDuration = 3000;
+    const flipInterval = 100;
+    let currentTime = 0;
+
+    const flipAnimation = setInterval(() => {
+      setFlipResult(Math.random() > 0.5 ? "heads" : "tails");
+      currentTime += flipInterval;
+
+      if (currentTime >= flipDuration) {
+        clearInterval(flipAnimation);
+
+        const finalResult = Math.random() > 0.5 ? "heads" : "tails";
+        setFlipResult(finalResult);
+        setFlipping(false);
+
+        const isCreator = lobby.creator_id === user.id;
+        const mySide = isCreator
+          ? lobby.creator_side
+          : lobby.creator_side === "heads"
+          ? "tails"
+          : "heads";
+        const won = finalResult === mySide;
+
+        let newBalance;
+        if (won) {
+          newBalance = balance + lobby.stake_amount;
+          setGameResult({
+            type: "win",
+            message: `You won $${lobby.stake_amount.toFixed(2)}!`,
+            result: finalResult,
+          });
+        } else {
+          newBalance = balance - lobby.stake_amount;
+          setGameResult({
+            type: "lose",
+            message: `You lost $${lobby.stake_amount.toFixed(2)}!`,
+            result: finalResult,
+          });
+        }
+
+        updateUserBalance(newBalance);
+        saveGameResult(lobby, won, finalResult);
+        updateLobbyStatus(
+          lobby.id,
+          finalResult,
+          won ? user.id : isCreator ? lobby.opponent_id : lobby.creator_id
+        );
+      }
+    }, flipInterval);
+  };
+
+  const updateLobbyStatus = async (lobbyId, result, winnerId) => {
+    try {
+      await supabase
+        .from("coinflip_lobbies")
+        .update({
+          status: "resolved",
+          result: result,
+          winner_id: winnerId,
+          resolved_at: new Date().toISOString(),
+        })
+        .eq("id", lobbyId);
+    } catch (error) {
+      console.error("Error updating lobby status:", error);
+    }
+  };
+
+  const cancelLobby = async () => {
+    if (!currentLobby) return;
+
+    try {
+      await supabase
+        .from("coinflip_lobbies")
+        .update({ status: "cancelled" })
+        .eq("id", currentLobby.id);
+
+      resetGame();
+    } catch (error) {
+      console.error("Error cancelling lobby:", error);
+    }
+  };
+
+  const resetGame = () => {
+    setCurrentLobby(null);
+    setFlipResult(null);
+    setGameResult(null);
+    setView("lobby-list");
+    fetchLobbies();
   };
 
   const renderLobbyList = () => (
@@ -344,7 +376,6 @@ const CoinFlip = () => {
         </h2>
 
         <div className="space-y-6">
-          {/* Stake Amount */}
           <div>
             <label className="block text-sm font-medium text-gray-200 mb-3">
               Stake Amount ($)
@@ -373,7 +404,6 @@ const CoinFlip = () => {
             </div>
           </div>
 
-          {/* Choose Side */}
           <div>
             <label className="block text-sm font-medium text-gray-200 mb-3">
               Choose Your Side
@@ -404,7 +434,6 @@ const CoinFlip = () => {
             </div>
           </div>
 
-          {/* Info Box */}
           <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
             <p className="text-blue-300 text-sm">
               <strong>Note:</strong> Your opponent will automatically be
@@ -413,7 +442,6 @@ const CoinFlip = () => {
             </p>
           </div>
 
-          {/* Buttons */}
           <div className="flex space-x-4">
             <button
               onClick={() => setView("lobby-list")}
@@ -446,7 +474,6 @@ const CoinFlip = () => {
           </h2>
 
           <div className="space-y-6">
-            {/* Stake Display */}
             <div className="text-center">
               <div className="text-5xl font-bold text-yellow-400 mb-2">
                 ${currentLobby?.stake_amount.toLocaleString()}
@@ -457,7 +484,6 @@ const CoinFlip = () => {
               </div>
             </div>
 
-            {/* Sides */}
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-white/5 border border-white/20 rounded-lg p-4 text-center">
                 <div className="text-3xl mb-2">
@@ -520,7 +546,6 @@ const CoinFlip = () => {
           Flipping Coin...
         </h2>
 
-        {/* Coin Animation */}
         <div className="flex justify-center mb-8">
           <div
             className={`w-40 h-40 rounded-full flex items-center justify-center text-6xl ${
@@ -544,7 +569,7 @@ const CoinFlip = () => {
                 gameResult.type === "win" ? "text-green-300" : "text-red-300"
               }`}
             >
-              {gameResult.type === "win" ? "🎉 YOU WON!" : "😔 YOU LOST"}
+              {gameResult.type === "win" ? "🎉 YOU WON!" : "😢 YOU LOST"}
             </div>
             <p
               className={`text-xl mb-2 ${
@@ -571,7 +596,6 @@ const CoinFlip = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
-      {/* Header */}
       <header className="bg-white/10 backdrop-blur-lg border-b border-white/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
@@ -614,7 +638,6 @@ const CoinFlip = () => {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {view === "lobby-list" && renderLobbyList()}
         {view === "create-lobby" && renderCreateLobby()}
