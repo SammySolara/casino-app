@@ -6,6 +6,7 @@ import SignUp from './components/auth/SignUp';
 import Dashboard from './components/dashboard/Dashboard';
 import DiceGame from './games/DiceGame';
 import { Dice1 } from 'lucide-react';
+import CoinFlip from './games/CoinFlip';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -86,9 +87,7 @@ const App = () => {
           } />
           <Route path="/games/coinflip" element={
             <ProtectedRoute>
-              <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
-                <div className="text-white text-2xl">Coin Flip - Coming Soon!</div>
-              </div>
+              <CoinFlip />
             </ProtectedRoute>
           } />
           <Route path="/games/blackjack" element={
