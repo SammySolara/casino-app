@@ -25,7 +25,7 @@ const CoinFlip = () => {
     }
   }, [userProfile]);
 
-  const fetchLobbies = async () => {
+  const fetchLobbies = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("coinflip_lobbies")
@@ -41,58 +41,64 @@ const CoinFlip = () => {
     } catch (error) {
       console.error("Error fetching lobbies:", error);
     }
-  };
+  }, []);
 
   const handleSignOut = async () => {
     await signOut();
     navigate("/signin");
   };
 
-  const updateUserBalance = async (newBalance) => {
-    try {
-      const { error } = await supabase
-        .from("users")
-        .update({ balance: newBalance })
-        .eq("id", user.id);
+  const updateUserBalance = useCallback(
+    async (newBalance) => {
+      try {
+        const { error } = await supabase
+          .from("users")
+          .update({ balance: newBalance })
+          .eq("id", user.id);
 
-      if (error) {
+        if (error) {
+          console.error("Error updating balance:", error);
+          return false;
+        }
+
+        setBalance(newBalance);
+        return true;
+      } catch (error) {
         console.error("Error updating balance:", error);
         return false;
       }
+    },
+    [user.id]
+  );
 
-      setBalance(newBalance);
-      return true;
-    } catch (error) {
-      console.error("Error updating balance:", error);
-      return false;
-    }
-  };
+  const saveGameResult = useCallback(
+    async (lobby, won, result) => {
+      try {
+        const { error } = await supabase.from("game_results").insert([
+          {
+            user_id: user.id,
+            game_type: "coinflip",
+            bet_amount: lobby.stake_amount,
+            win_chance: 50,
+            multiplier: 2,
+            roll_result: result === "heads" ? 1 : 0,
+            won: won,
+            payout: won ? lobby.stake_amount * 2 : 0,
+            created_at: new Date().toISOString(),
+          },
+        ]);
 
-  const saveGameResult = async (lobby, won, result) => {
-    try {
-      const { error } = await supabase.from("game_results").insert([
-        {
-          user_id: user.id,
-          game_type: "coinflip",
-          bet_amount: lobby.stake_amount,
-          win_chance: 50,
-          multiplier: 2,
-          roll_result: result === "heads" ? 1 : 0,
-          won: won,
-          payout: won ? lobby.stake_amount * 2 : 0,
-          created_at: new Date().toISOString(),
-        },
-      ]);
-
-      if (error) {
+        if (error) {
+          console.error("Error saving game result:", error);
+        }
+      } catch (error) {
         console.error("Error saving game result:", error);
       }
-    } catch (error) {
-      console.error("Error saving game result:", error);
-    }
-  };
+    },
+    [user.id]
+  );
 
-  const updateLobbyStatus = async (lobbyId, result, winnerId) => {
+  const updateLobbyStatus = useCallback(async (lobbyId, result, winnerId) => {
     try {
       await supabase
         .from("coinflip_lobbies")
@@ -106,7 +112,7 @@ const CoinFlip = () => {
     } catch (error) {
       console.error("Error updating lobby status:", error);
     }
-  };
+  }, []);
 
   const executeFlip = useCallback(
     async (lobby) => {
@@ -164,7 +170,7 @@ const CoinFlip = () => {
         }
       }, flipInterval);
     },
-    [user.id, saveGameResult, updateUserBalance]
+    [user.id, saveGameResult, updateUserBalance, updateLobbyStatus]
   );
 
   useEffect(() => {
@@ -197,7 +203,7 @@ const CoinFlip = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentLobby, user.id, executeFlip]);
+  }, [currentLobby, user.id, executeFlip, fetchLobbies]);
 
   const createLobby = async () => {
     if (stakeAmount <= 0) {
