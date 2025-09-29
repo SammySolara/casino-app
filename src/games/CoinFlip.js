@@ -164,7 +164,7 @@ const CoinFlip = () => {
         }
       }, flipInterval);
     },
-    [user.id]
+    [user.id, saveGameResult, updateUserBalance]
   );
 
   useEffect(() => {
