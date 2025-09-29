@@ -1,14 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  DollarSign,
-  Coins,
-  ArrowLeft,
-  Users,
-  RefreshCw,
-  Trophy,
-  Crown,
-} from "lucide-react";
+import { DollarSign, Coins, ArrowLeft, Users, RefreshCw } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 
@@ -32,38 +24,6 @@ const CoinFlip = () => {
       setBalance(userProfile.balance);
     }
   }, [userProfile]);
-
-  useEffect(() => {
-    fetchLobbies();
-
-    const channel = supabase
-      .channel("coinflip-lobbies")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "coinflip_lobbies",
-        },
-        (payload) => {
-          fetchLobbies();
-
-          if (currentLobby && payload.new?.id === currentLobby.id) {
-            if (payload.new.status === "filled" && payload.new.opponent_id) {
-              setCurrentLobby(payload.new);
-              if (payload.new.creator_id === user.id) {
-                setTimeout(() => executeFlip(payload.new), 2000);
-              }
-            }
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [currentLobby, user.id]);
 
   const fetchLobbies = async () => {
     try {
@@ -131,6 +91,113 @@ const CoinFlip = () => {
       console.error("Error saving game result:", error);
     }
   };
+
+  const updateLobbyStatus = async (lobbyId, result, winnerId) => {
+    try {
+      await supabase
+        .from("coinflip_lobbies")
+        .update({
+          status: "resolved",
+          result: result,
+          winner_id: winnerId,
+          resolved_at: new Date().toISOString(),
+        })
+        .eq("id", lobbyId);
+    } catch (error) {
+      console.error("Error updating lobby status:", error);
+    }
+  };
+
+  const executeFlip = useCallback(
+    async (lobby) => {
+      setView("flipping");
+      setFlipping(true);
+      setFlipResult(null);
+      setGameResult(null);
+
+      const flipDuration = 3000;
+      const flipInterval = 100;
+      let currentTime = 0;
+
+      const flipAnimation = setInterval(() => {
+        setFlipResult(Math.random() > 0.5 ? "heads" : "tails");
+        currentTime += flipInterval;
+
+        if (currentTime >= flipDuration) {
+          clearInterval(flipAnimation);
+
+          const finalResult = Math.random() > 0.5 ? "heads" : "tails";
+          setFlipResult(finalResult);
+          setFlipping(false);
+
+          const isCreator = lobby.creator_id === user.id;
+          const mySide = isCreator
+            ? lobby.creator_side
+            : lobby.creator_side === "heads"
+            ? "tails"
+            : "heads";
+          const won = finalResult === mySide;
+
+          setBalance((currentBalance) => {
+            const newBalance = won
+              ? currentBalance + lobby.stake_amount
+              : currentBalance - lobby.stake_amount;
+
+            updateUserBalance(newBalance);
+            return newBalance;
+          });
+
+          setGameResult({
+            type: won ? "win" : "lose",
+            message: won
+              ? `You won $${lobby.stake_amount.toFixed(2)}!`
+              : `You lost $${lobby.stake_amount.toFixed(2)}!`,
+            result: finalResult,
+          });
+
+          saveGameResult(lobby, won, finalResult);
+          updateLobbyStatus(
+            lobby.id,
+            finalResult,
+            won ? user.id : isCreator ? lobby.opponent_id : lobby.creator_id
+          );
+        }
+      }, flipInterval);
+    },
+    [user.id]
+  );
+
+  useEffect(() => {
+    fetchLobbies();
+
+    const channel = supabase
+      .channel("coinflip-lobbies")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "coinflip_lobbies",
+        },
+        (payload) => {
+          fetchLobbies();
+
+          if (currentLobby && payload.new?.id === currentLobby.id) {
+            if (payload.new.status === "filled" && payload.new.opponent_id) {
+              setCurrentLobby(payload.new);
+              if (payload.new.creator_id === user.id) {
+                setTimeout(() => executeFlip(payload.new), 2000);
+              }
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentLobby, user.id, executeFlip]);
 
   const createLobby = async () => {
     if (stakeAmount <= 0) {
@@ -205,79 +272,6 @@ const CoinFlip = () => {
       alert("Error joining lobby");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const executeFlip = async (lobby) => {
-    setView("flipping");
-    setFlipping(true);
-    setFlipResult(null);
-    setGameResult(null);
-
-    const flipDuration = 3000;
-    const flipInterval = 100;
-    let currentTime = 0;
-
-    const flipAnimation = setInterval(() => {
-      setFlipResult(Math.random() > 0.5 ? "heads" : "tails");
-      currentTime += flipInterval;
-
-      if (currentTime >= flipDuration) {
-        clearInterval(flipAnimation);
-
-        const finalResult = Math.random() > 0.5 ? "heads" : "tails";
-        setFlipResult(finalResult);
-        setFlipping(false);
-
-        const isCreator = lobby.creator_id === user.id;
-        const mySide = isCreator
-          ? lobby.creator_side
-          : lobby.creator_side === "heads"
-          ? "tails"
-          : "heads";
-        const won = finalResult === mySide;
-
-        let newBalance;
-        if (won) {
-          newBalance = balance + lobby.stake_amount;
-          setGameResult({
-            type: "win",
-            message: `You won $${lobby.stake_amount.toFixed(2)}!`,
-            result: finalResult,
-          });
-        } else {
-          newBalance = balance - lobby.stake_amount;
-          setGameResult({
-            type: "lose",
-            message: `You lost $${lobby.stake_amount.toFixed(2)}!`,
-            result: finalResult,
-          });
-        }
-
-        updateUserBalance(newBalance);
-        saveGameResult(lobby, won, finalResult);
-        updateLobbyStatus(
-          lobby.id,
-          finalResult,
-          won ? user.id : isCreator ? lobby.opponent_id : lobby.creator_id
-        );
-      }
-    }, flipInterval);
-  };
-
-  const updateLobbyStatus = async (lobbyId, result, winnerId) => {
-    try {
-      await supabase
-        .from("coinflip_lobbies")
-        .update({
-          status: "resolved",
-          result: result,
-          winner_id: winnerId,
-          resolved_at: new Date().toISOString(),
-        })
-        .eq("id", lobbyId);
-    } catch (error) {
-      console.error("Error updating lobby status:", error);
     }
   };
 
@@ -463,7 +457,6 @@ const CoinFlip = () => {
   );
 
   const renderInLobby = () => {
-    const isCreator = currentLobby?.creator_id === user.id;
     const waiting = currentLobby?.status === "open";
 
     return (
